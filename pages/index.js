@@ -385,27 +385,33 @@ async function updateInchiTab4() {
     log.push(molfileResult.message);
   }
 
+  // Use the Ketcher editor to get the Ket format (Ketcher's structure serialization) from the Molfile generated from
+  // AuxInfo. The Ket format represents a simple JSON object.
+  // Schema: https://github.com/epam/ketcher/blob/master/packages/ketcher-core/src/domain/serializers/ket/schema.json
   await ketcherInput.setMolecule(molfileResult.molfile);
+  const ketStringFromAuxInfo = await ketcherInput.getKet();
+  ketcherInput.editor.clear();
+
   // The atom order in the Molfile from AuxInfo is identical to the input Molfile, so we can assign labels in
   // ascending order.
-  await assignAscendingAtomLabelsInKetcher(ketcherInput);
+  let ketFromAuxInfo = JSON.parse(ketStringFromAuxInfo);
+  assignAscendingAtomLabelsToKet(ketFromAuxInfo);
+  await ketcherInput.setMolecule(JSON.stringify(ketFromAuxInfo));
 
   writeResult(log.join("\n"), logTextElementId);
 }
 
-async function assignAscendingAtomLabelsInKetcher(ketcher) {
-  const ketObject = JSON.parse(await ketcher.getKet()) ;
+function assignAscendingAtomLabelsToKet(ketObject) {
   const moleculesInKetObject = ketObject?.root?.nodes.map(node => ketObject[node["$ref"]]);
 
   moleculesInKetObject.forEach(mol => {
-    let label = 1;
+    let atomNumber = 1;
     mol?.atoms.forEach(atom => {
-      atom.alias = atom.label + "/" + label.toString();
-      label++;
+      // "label" is the chemical element symbol. The "alias" overrides "label" in the UI.
+      atom.alias = atom.label + "/" + atomNumber.toString();
+      atomNumber++;
     });
   });
-
-  await ketcher.setMolecule(JSON.stringify(ketObject))
 }
 
 async function onChangeInChIVersionTab4() {
