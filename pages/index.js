@@ -13,6 +13,9 @@ function onBodyLoad() {
 
   addVersions("inchi-tab3-pane", availableInchiVersions);
 
+  addVersions("inchi-tab4-pane", availableInchiVersions);
+  addInchiOptionsForm("inchi-tab4-pane", () => updateInchiTab4());
+
   addVersions("rinchi-tab1-pane", availableRInchiVersions);
   addVersions("rinchi-tab2-pane", availableRInchiVersions);
   addVersions("rinchi-tab3-pane", availableRInchiVersions);
@@ -335,6 +338,14 @@ async function updateInchiTab3() {
     log.push(molfileResult.message);
   }
   writeResult(log.join("\n"), logTextElementId);
+}
+
+async function updateInchiTab4() {
+
+}
+
+async function onChangeInChIVersionTab4() {
+  await onChangeInChIVersion("inchi-tab4-pane", () => updateInchiTab4())
 }
 
 async function updateRinchiTab1() {
