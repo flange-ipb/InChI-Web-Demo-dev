@@ -341,7 +341,71 @@ async function updateInchiTab3() {
 }
 
 async function updateInchiTab4() {
+  const molfile = document.getElementById("inchi-tab4-molfileTextarea").value;
+  const options = collectInchiOptions("inchi-tab4-pane");
+  const inchiVersion = getVersion("inchi-tab4-pane");
+  const ketcherInput = getKetcher("inchi-tab4-ketcher-input-structure");
+  const ketcherResult = getKetcher("inchi-tab4-ketcher-result-structure");
+  const logTextElementId = "inchi-tab4-logs";
 
+  // clear outputs
+  ketcherInput.editor.clear();
+  ketcherResult.editor.clear();
+  writeResult("", logTextElementId);
+
+  const log = [];
+  log.push("InChI options: " + options);
+
+  // input Molfile -> InChI/AuxInfo
+  let inchiResult;
+  try {
+    inchiResult = await inchiFromMolfile(molfile, options, inchiVersion);
+  } catch(e) {
+    writeResult(e, logTextElementId);
+    return;
+  }
+  if (inchiResult.log !== "") {
+    log.push(inchiResult.log);
+  }
+  const inchi = inchiResult.inchi
+  const auxinfo = inchiResult.auxinfo
+
+  // AuxInfo -> Molfile from InChI's interpretation
+  let molfileResult;
+  try {
+    molfileResult = await molfileFromAuxinfo(auxinfo, 0, 0, inchiVersion);
+  } catch(e) {
+    writeResult(e, logTextElementId);
+    return;
+  }
+  if (molfileResult.log !== "") {
+    log.push(molfileResult.log);
+  }
+  if (molfileResult.message !== "") {
+    log.push(molfileResult.message);
+  }
+
+  await ketcherInput.setMolecule(molfileResult.molfile);
+  // The atom order in the Molfile from AuxInfo is identical to the input Molfile, so we can assign labels in
+  // ascending order.
+  await assignAscendingAtomLabelsInKetcher(ketcherInput);
+
+  writeResult(log.join("\n"), logTextElementId);
+}
+
+async function assignAscendingAtomLabelsInKetcher(ketcher) {
+  const ketObject = JSON.parse(await ketcher.getKet()) ;
+  const moleculesInKetObject = ketObject?.root?.nodes.map(node => ketObject[node["$ref"]]);
+
+  moleculesInKetObject.forEach(mol => {
+    let label = 1;
+    mol?.atoms.forEach(atom => {
+      atom.alias = atom.label + "/" + label.toString();
+      label++;
+    });
+  });
+
+  await ketcher.setMolecule(JSON.stringify(ketObject))
 }
 
 async function onChangeInChIVersionTab4() {
