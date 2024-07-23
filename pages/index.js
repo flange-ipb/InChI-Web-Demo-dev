@@ -371,18 +371,18 @@ async function updateInchiTab4() {
   const auxinfo = inchiResult.auxinfo
 
   // AuxInfo -> Molfile from InChI's interpretation
-  let molfileResult;
+  let molfileFromAuxinfoResult;
   try {
-    molfileResult = await molfileFromAuxinfo(auxinfo, 0, 0, inchiVersion);
+    molfileFromAuxinfoResult = await molfileFromAuxinfo(auxinfo, 0, 0, inchiVersion);
   } catch(e) {
     writeResult(e, logTextElementId);
     return;
   }
-  if (molfileResult.log !== "") {
-    log.push(molfileResult.log);
+  if (molfileFromAuxinfoResult.log !== "") {
+    log.push(molfileFromAuxinfoResult.log);
   }
-  if (molfileResult.message !== "") {
-    log.push(molfileResult.message);
+  if (molfileFromAuxinfoResult.message !== "") {
+    log.push(molfileFromAuxinfoResult.message);
   }
 
   // Use the Ketcher editor to get the Ket format (Ketcher's structure serialization) from the Molfile generated from
