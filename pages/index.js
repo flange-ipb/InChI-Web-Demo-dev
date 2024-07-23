@@ -368,12 +368,27 @@ async function updateInchiTab4() {
     log.push(inchiResult.log);
   }
   const inchi = inchiResult.inchi
-  const auxinfo = inchiResult.auxinfo
+  const auxInfo = inchiResult.auxinfo
 
-  // AuxInfo -> Molfile from InChI's interpretation
+  // InChI -> Molfile with canonical atom order (without coordinates)
+  let molfileFromInChIResult;
+  try {
+    molfileFromInChIResult = await molfileFromInchi(inchi, "", inchiVersion);
+  } catch(e) {
+    writeResult(e, logTextElementId);
+    return;
+  }
+  if (molfileFromInChIResult.log !== "") {
+    log.push(molfileFromInChIResult.log);
+  }
+  if (molfileFromInChIResult.message !== "") {
+    log.push(molfileFromInChIResult.message);
+  }
+
+  // AuxInfo -> Molfile with atom order from input Molfile (with coordinates)
   let molfileFromAuxinfoResult;
   try {
-    molfileFromAuxinfoResult = await molfileFromAuxinfo(auxinfo, 0, 0, inchiVersion);
+    molfileFromAuxinfoResult = await molfileFromAuxinfo(auxInfo, 0, 0, inchiVersion);
   } catch(e) {
     writeResult(e, logTextElementId);
     return;
@@ -385,32 +400,25 @@ async function updateInchiTab4() {
     log.push(molfileFromAuxinfoResult.message);
   }
 
-  // Use the Ketcher editor to get the Ket format (Ketcher's structure serialization) from the Molfile generated from
-  // AuxInfo. The Ket format represents a simple JSON object.
-  // Schema: https://github.com/epam/ketcher/blob/master/packages/ketcher-core/src/domain/serializers/ket/schema.json
-  await ketcherInput.setMolecule(molfileResult.molfile);
-  const ketStringFromAuxInfo = await ketcherInput.getKet();
-  ketcherInput.editor.clear();
-
-  // The atom order in the Molfile from AuxInfo is identical to the input Molfile, so we can assign labels in
-  // ascending order.
-  let ketFromAuxInfo = JSON.parse(ketStringFromAuxInfo);
-  assignAscendingAtomLabelsToKet(ketFromAuxInfo);
-  await ketcherInput.setMolecule(JSON.stringify(ketFromAuxInfo));
+  /*
+   * Use Ketcher's internal Struct object to set the atom labels. Unlike Ketcher's Ket format, the Struct object is not
+   * processed by the Indigo framework and does not suffer from fragmentation (when multiple molecules are present in
+   * the structure) and thus atom reordering.
+   */
+  await ketcherInput.setMolecule(molfileFromAuxinfoResult.molfile);
+  const structFromAuxInfo = ketcherInput.editor.struct();
+  assignAscendingAtomLabelsInStruct(structFromAuxInfo);
+  ketcherInput.editor.struct(structFromAuxInfo); // setting the struct redraws the structure
 
   writeResult(log.join("\n"), logTextElementId);
 }
 
-function assignAscendingAtomLabelsToKet(ketObject) {
-  const moleculesInKetObject = ketObject?.root?.nodes.map(node => ketObject[node["$ref"]]);
-
-  moleculesInKetObject.forEach(mol => {
-    let atomNumber = 1;
-    mol?.atoms.forEach(atom => {
-      // "label" is the chemical element symbol. The "alias" overrides "label" in the UI.
-      atom.alias = atom.label + "/" + atomNumber.toString();
-      atomNumber++;
-    });
+function assignAscendingAtomLabelsInStruct(struct) {
+  let atomNumber = 1;
+  struct.atoms.forEach(atom => {
+    // "label" is the chemical element symbol. The "alias" overrides "label" in the UI.
+    atom.alias = atom.label + "/" + atomNumber.toString();
+    atomNumber++;
   });
 }
 
