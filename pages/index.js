@@ -367,8 +367,8 @@ async function updateInchiTab4() {
   if (inchiResult.log !== "") {
     log.push(inchiResult.log);
   }
-  const inchi = inchiResult.inchi
-  const auxInfo = inchiResult.auxinfo
+  const inchi = inchiResult.inchi;
+  const auxInfo = inchiResult.auxinfo;
 
   // InChI -> Molfile with canonical atom order (without coordinates)
   let molfileFromInChIResult;
@@ -410,7 +410,30 @@ async function updateInchiTab4() {
   assignAscendingAtomLabelsInStruct(structFromAuxInfo);
   ketcherInput.editor.struct(structFromAuxInfo); // setting the struct redraws the structure
 
+  const mapping = atomLabelMappingFromAuxInfo(auxInfo);
+
+  await ketcherResult.setMolecule(molfileFromInChIResult.molfile);
+  const structFromInChI = ketcherResult.editor.struct();
+  copyCoordinatesAccordingToMapping(structFromAuxInfo.atoms, structFromInChI.atoms, mapping);
+  assignAscendingAtomLabelsInStruct(structFromInChI);
+  ketcherResult.editor.struct(structFromInChI);
+
   writeResult(log.join("\n"), logTextElementId);
+}
+
+// Returns association from input atom number to canonical atom number
+function atomLabelMappingFromAuxInfo(auxInfo) {
+  const match = auxInfo.match(/\/N:([\d,;]*)\//);
+  if (!match) return new Map();
+  const nLayer = match[1];
+
+  const result = new Map();
+  let canonicalAtomNumber = 1;
+  nLayer.split(/[,;]/).forEach(inputNumberString => {
+    result.set(parseInt(inputNumberString), canonicalAtomNumber++);
+  });
+
+  return result;
 }
 
 function assignAscendingAtomLabelsInStruct(struct) {
@@ -419,6 +442,16 @@ function assignAscendingAtomLabelsInStruct(struct) {
     // "label" is the chemical element symbol. The "alias" overrides "label" in the UI.
     atom.alias = atom.label + "/" + atomNumber.toString();
     atomNumber++;
+  });
+}
+
+function copyCoordinatesAccordingToMapping(sourceAtoms, targetAtoms, mapping) {
+  mapping.forEach((inputAtomNumber, canonicalAtomNumber) => {
+    const sourcePpObject = sourceAtoms.get(canonicalAtomNumber - 1).pp;
+    const targetPpObject = targetAtoms.get(inputAtomNumber - 1).pp;
+    targetPpObject.x = sourcePpObject.x;
+    targetPpObject.y = sourcePpObject.y;
+    targetPpObject.z = sourcePpObject.z;
   });
 }
 
